@@ -45,6 +45,11 @@ namespace widemeadows.Visualization.Mandelbrot
         const PixelFormat PixelFormat = System.Drawing.Imaging.PixelFormat.Format32bppArgb;
 
         /// <summary>
+        /// The last window state
+        /// </summary>
+        private FormWindowState LastWindowState;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="BrotForm"/> class.
         /// </summary>
         public BrotForm()
@@ -58,6 +63,8 @@ namespace widemeadows.Visualization.Mandelbrot
                 ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.UserPaint,
                 true);
+
+            LastWindowState = WindowState;
         }
 
         /// <summary>
@@ -88,6 +95,24 @@ namespace widemeadows.Visualization.Mandelbrot
         {
             base.OnResizeEnd(e);
             PrepareNewBufferAndInvalidate();
+        }
+
+        /// <summary>
+        /// Handles the <see cref="E:Resize" /> event.
+        /// </summary>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+
+            // The maximize event is not caught by the OnResize*() methods,
+            // so we'll handle it here if the form is being maximized.
+            if (LastWindowState == WindowState) return;
+            LastWindowState = WindowState;
+            if (WindowState == FormWindowState.Maximized || WindowState == FormWindowState.Normal)
+            {
+                PrepareNewBufferAndInvalidate();
+            }
         }
 
         /// <summary>
