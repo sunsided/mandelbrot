@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Numerics;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using JetBrains.Annotations;
 
@@ -181,7 +182,6 @@ namespace widemeadows.Visualization.Mandelbrot
             // Predetermine width and height "constants"
             var width = buffer.Width;
             var height = buffer.Height;
-            var scaledWidth = bytesPerPixel * width;
 
             // Lock the bitmap for rendering
             var bitmapData = buffer.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadWrite, PixelFormat);
@@ -197,31 +197,31 @@ namespace widemeadows.Visualization.Mandelbrot
             var pixelIncrease = _deltaReal;
 
             // iterate over all lines and columns
-            var linePointer = basePointer;
-            for (var y = 0; y < height; ++y)
-            {
-                var pixel = linePointer;
-                var pixelPosition = linePosition;
-                for (var x = 0; x < scaledWidth; x += bytesPerPixel)
-                {
-                    // do the Mandelmagic
-                    var iterations = CalculateFractalIterations(pixelPosition);
+            var options = new ParallelOptions
+                          {
+                              MaxDegreeOfParallelism = Environment.ProcessorCount
+                          };
+            Parallel.For(0, height, options, y =>
+                                    {
+                                        var linePointer = basePointer + y*stride;
+                                        var pixel = linePointer;
+                                        var pixelPosition = linePosition + y*lineIncrease;
+                                        for (var x = 0; x < width; ++x)
+                                        {
+                                            // do the Mandelmagic
+                                            var iterations = CalculateFractalIterations(pixelPosition);
 
-                    // patch the colors
-                    pixel[0] = 0; // blue
-                    pixel[1] = 0; // green
-                    pixel[2] = (byte)iterations; // red
-                    pixel[3] = 255; // alpha
+                                            // patch the colors
+                                            pixel[0] = 0; // blue
+                                            pixel[1] = 0; // green
+                                            pixel[2] = (byte) iterations; // red
+                                            pixel[3] = 255; // alpha
 
-                    // advance the pixel pointer
-                    pixel += bytesPerPixel;
-                    pixelPosition += pixelIncrease;
-                }
-
-                // advance the line pointer
-                linePointer += stride;
-                linePosition += lineIncrease;
-            }
+                                            // advance the pixel pointer
+                                            pixel += bytesPerPixel;
+                                            pixelPosition += pixelIncrease;
+                                        }
+                                    });
             
             // Release the Kraken
             buffer.UnlockBits(bitmapData);
@@ -233,7 +233,7 @@ namespace widemeadows.Visualization.Mandelbrot
         /// </summary>
         /// <param name="c">The location in the complex plane.</param>
         /// <returns>System.Int32.</returns>
-        private int CalculateFractalIterations(Complex c)
+        private static int CalculateFractalIterations(Complex c)
         {
             const int maxIterations = 255;
             var iteration = 0;
