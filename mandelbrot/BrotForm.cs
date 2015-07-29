@@ -1,9 +1,10 @@
 ﻿using System;
-using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Numerics;
 using System.Windows.Forms;
+using JetBrains.Annotations;
 
 namespace widemeadows.Visualization.Mandelbrot
 {
@@ -15,7 +16,33 @@ namespace widemeadows.Visualization.Mandelbrot
         /// <summary>
         /// The back buffer for rendering the Mandelbrot set
         /// </summary>
+        [CanBeNull]
         private Bitmap _backBuffer;
+        
+        /// <summary>
+        /// The starting position
+        /// </summary>
+        private Complex _topLeft = new Complex(-2D, 1D);
+
+        /// <summary>
+        /// The end position
+        /// </summary>
+        private Complex _bottomRight = new Complex(1D, -1D);
+
+        /// <summary>
+        /// The delta value on the imaginary axis
+        /// </summary>
+        private Complex _deltaImaginary;
+        
+        /// <summary>
+        /// The delta value on the real axis
+        /// </summary>
+        private Complex _deltaReal;
+
+        /// <summary>
+        /// The pixel format
+        /// </summary>
+        const PixelFormat PixelFormat = System.Drawing.Imaging.PixelFormat.Format32bppArgb;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BrotForm"/> class.
@@ -29,19 +56,72 @@ namespace widemeadows.Visualization.Mandelbrot
                 ControlStyles.DoubleBuffer |
                 ControlStyles.Opaque |
                 ControlStyles.OptimizedDoubleBuffer |
-                ControlStyles.ResizeRedraw |
                 ControlStyles.UserPaint,
                 true);
         }
 
         /// <summary>
-        /// Handles the <see cref="E:Resize" /> event.
+        /// Handles the <see cref="E:Load" /> event.
         /// </summary>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected override void OnResize(EventArgs e)
+        protected override void OnLoad(EventArgs e)
         {
-            base.OnResize(e);
-            _backBuffer = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppArgb);
+            base.OnLoad(e);
+            PrepareNewBufferAndInvalidate();
+        }
+
+        /// <summary>
+        /// Handles the <see cref="E:ResizeBegin" /> event.
+        /// </summary>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected override void OnResizeBegin(EventArgs e)
+        {
+            base.OnResizeBegin(e);
+            ResetBuffer();
+        }
+
+        /// <summary>
+        /// Handles the <see cref="E:ResizeEnd" /> event.
+        /// </summary>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected override void OnResizeEnd(EventArgs e)
+        {
+            base.OnResizeEnd(e);
+            PrepareNewBufferAndInvalidate();
+        }
+
+        /// <summary>
+        /// Resets the buffer.
+        /// </summary>
+        private void ResetBuffer()
+        {
+            _backBuffer = null;
+        }
+
+        /// <summary>
+        /// Prepares the new buffer and invalidates the display.
+        /// </summary>
+        private void PrepareNewBufferAndInvalidate()
+        {
+            var width = ClientSize.Width;
+            var height = ClientSize.Height;
+
+            // create a new image buffer
+            _backBuffer = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat);
+
+            // determine the range in the complex plane
+            _topLeft = new Complex(-2D, 1D);
+            _bottomRight = new Complex(1D, -1D);
+
+            // determine the step parameters in the complex plane
+            var realDelta = (_bottomRight.Real - _topLeft.Real)/(width - 1D);
+            var imagDelta = (_bottomRight.Imaginary - _topLeft.Imaginary)/(height - 1D); // flipped, because of the way the bitmap works
+
+            // calculate the actual positions and steps in the complex plane
+            _deltaImaginary = new Complex(0, imagDelta);
+            _deltaReal = new Complex(realDelta, 0);
+
+            Invalidate();
         }
 
         /// <summary>
@@ -54,6 +134,9 @@ namespace widemeadows.Visualization.Mandelbrot
 
             // Fetch the buffer
             var buffer = _backBuffer;
+            if (buffer == null) return;
+
+            // Bake the bread
             RenderMandelbrotSet(buffer);
 
             // Render the back buffer onto the form
@@ -65,9 +148,9 @@ namespace widemeadows.Visualization.Mandelbrot
         /// Renders the mandelbrot set onto the <paramref name="buffer"/>.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
-        private unsafe void RenderMandelbrotSet(Bitmap buffer)
+        private unsafe void RenderMandelbrotSet([NotNull] Bitmap buffer)
         {
-            const PixelFormat pixelFormat = PixelFormat.Format32bppArgb;
+            Debug.Assert(PixelFormat == PixelFormat.Format32bppArgb, "pixelFormat == PixelFormat.Format32bppArgb");
             const int bytesPerPixel = 4;
 
             // Predetermine width and height "constants"
@@ -76,27 +159,17 @@ namespace widemeadows.Visualization.Mandelbrot
             var scaledWidth = bytesPerPixel * width;
 
             // Lock the bitmap for rendering
-            var bitmapData = buffer.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadWrite, pixelFormat);
+            var bitmapData = buffer.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadWrite, PixelFormat);
             var scan0 = bitmapData.Scan0;
 
             // fetch some base pointers
             var stride = bitmapData.Stride;
             var basePointer = (byte*) scan0.ToPointer();
-
-            // determine the range in the complex plane
-            var realMin = -2D;
-            var realMax = 1D;
-            var imagMin = -1D;
-            var imagMax = 1D;
-
-            // determine the step parameters in the complex plane
-            var realDelta = (realMax - realMin) /(width - 1D);
-            var imagDelta = (imagMin - imagMax)/(height - 1D); // flipped, because of the way the bitmap works
-
+            
             // determine the running variables in the complex plane
-            var linePosition = new Complex(realMin, imagMax);
-            var lineIncrease = new Complex(0, imagDelta);
-            var pixelIncrease = new Complex(realDelta, 0);
+            var linePosition = _topLeft;
+            var lineIncrease = _deltaImaginary;
+            var pixelIncrease = _deltaReal;
 
             // iterate over all lines and columns
             var linePointer = basePointer;
@@ -124,7 +197,7 @@ namespace widemeadows.Visualization.Mandelbrot
                 linePointer += stride;
                 linePosition += lineIncrease;
             }
-
+            
             // Release the Kraken
             buffer.UnlockBits(bitmapData);
         }
