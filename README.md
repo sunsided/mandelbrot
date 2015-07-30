@@ -1,7 +1,7 @@
 Mandelbrot
 ==========
 
-The Mandelbrot set rendered on a Windows Form in C#. Because why not. 
+The Mandelbrot set rendered on a Windows Form in C# using OpenTK. Because why not. 
 
 ![](screenshot.png)
 
