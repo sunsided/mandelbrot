@@ -58,6 +58,11 @@ namespace widemeadows.Visualization.Mandelbrot
         private FormWindowState LastWindowState;
 
         /// <summary>
+        /// The OpenGL texture identifier as created in the call to <see cref="SetupTexture"/>
+        /// </summary>
+        private int _textureId;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="BrotForm"/> class.
         /// </summary>
         public BrotForm()
@@ -167,12 +172,14 @@ namespace widemeadows.Visualization.Mandelbrot
             var buffer = _backBuffer;
             if (buffer == null) return;
 
+            /*
             // Bake the bread
             RenderMandelbrotSet(buffer);
 
             // Render the back buffer onto the form
             var gr = e.Graphics;
             gr.DrawImageUnscaledAndClipped(buffer, ClientRectangle);
+            */
         }
 
         /// <summary>
@@ -189,7 +196,7 @@ namespace widemeadows.Visualization.Mandelbrot
             var height = buffer.Height;
 
             // Lock the bitmap for rendering
-            var bitmapData = buffer.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadWrite, PixelFormat);
+            var bitmapData = buffer.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat);
             var scan0 = bitmapData.Scan0;
 
             // fetch some base pointers
@@ -284,9 +291,49 @@ namespace widemeadows.Visualization.Mandelbrot
         {
             _glLoaded = true;
 
-            // set rendering defaults
             GL.ClearColor(Color.OrangeRed);
+            GL.Enable(EnableCap.Texture2D);
+
             SetupViewport();
+            SetupTexture();
+        }
+
+        /// <summary>
+        /// Handles the Resize event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        private void glControl_Resize(object sender, EventArgs e)
+        {
+            if (!_glLoaded) return;
+            SetupViewport();
+        }
+
+        /// <summary>
+        /// Prepares the rendering texture
+        /// </summary>
+        private void SetupTexture()
+        {
+            // Create a texture and bind it for all future texture function calls
+
+            var id = _textureId = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, id);
+
+            // We will not upload mipmaps, so disable mipmapping (otherwise the texture will not appear).
+            // We can use GL.GenerateMipmaps() or GL.Ext.GenerateMipmaps() to create
+            // mipmaps automatically. In that case, use TextureMinFilter.LinearMipmapLinear to enable them.
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+
+            // Render the mandelbrot set onto the buffer
+            PrepareNewBufferAndInvalidate();
+            RenderMandelbrotSet(_backBuffer);
+            
+            var data = _backBuffer.LockBits(new Rectangle(0, 0, _backBuffer.Width, _backBuffer.Height), ImageLockMode.ReadOnly, PixelFormat);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, _backBuffer.Width, _backBuffer.Height, 0, OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
+            _backBuffer.UnlockBits(data);
         }
 
         /// <summary>
@@ -301,21 +348,15 @@ namespace widemeadows.Visualization.Mandelbrot
             GL.MatrixMode(MatrixMode.Projection);
             GL.LoadIdentity();
 
-            // lower-left corner is (0,0)
-            GL.Ortho(0, width, 0, height, -1, 1);
+            // top-left corner is (0,0)
+            GL.Ortho(0, 1, 1, 0, -1, 1);
 
             // use the full painting area
             GL.Viewport(0, 0, width, height); // Use all of the glControl painting area
-        }
 
-        /// <summary>
-        /// Handles the Resize event of the glControl control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        private void glControl_Resize(object sender, EventArgs e)
-        {
-            if (!_glLoaded) return;
+            // Prepare the modelview matrix
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
         }
 
         /// <summary>
@@ -327,17 +368,29 @@ namespace widemeadows.Visualization.Mandelbrot
         {
             if (!_glLoaded) return;
 
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            GL.Clear(ClearBufferMask.DepthBufferBit);
 
-            GL.MatrixMode(MatrixMode.Modelview);
             GL.LoadIdentity();
-            GL.Color3(Color.Yellow);
-            GL.Begin(PrimitiveType.TriangleFan);
-            GL.Vertex2(10, 20);
-            GL.Vertex2(100, 20);
-            GL.Vertex2(100, 50);
+
+            // Texture is already bound
+            //GL.BindTexture(TextureTarget.Texture2D, _textureId);
+
+            GL.Begin(PrimitiveType.Quads);
+            GL.TexCoord2(0, 0);
+            GL.Vertex2(0, 0);
+
+            GL.TexCoord2(1, 0);
+            GL.Vertex2(1, 0);
+
+            GL.TexCoord2(1, 1);
+            GL.Vertex2(1, 1);
+            
+            GL.TexCoord2(0, 1);
+            GL.Vertex2(0, 1);
+            
             GL.End();
 
+            GL.Flush();
             glControl.SwapBuffers();
         }
     }
