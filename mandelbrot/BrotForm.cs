@@ -412,9 +412,7 @@ namespace widemeadows.Visualization.Mandelbrot
             var current = (new Vector2(_mouseDownLocation.X, _mouseDownLocation.Y) - formTopLeft) / (formBottomRight - formTopLeft);
 
             // interpolate the normalized location to the original bounds
-            var originalTopLeft = topLeft;
-            var originalBottomRight = bottomRight;
-            current = (originalBottomRight - originalTopLeft)*current + originalTopLeft;
+            current = (bottomRight - topLeft)*current + topLeft;
 
             // calculate the new position
             topLeft = (topLeft - current)*zoomFactor + current;
