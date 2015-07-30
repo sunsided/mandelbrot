@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.Numerics;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using JetBrains.Annotations;
 using OpenTK.Graphics.OpenGL;
-using PixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace widemeadows.Visualization.Mandelbrot
 {
@@ -20,12 +17,6 @@ namespace widemeadows.Visualization.Mandelbrot
         /// Determines if the OpenGL control has been loaded
         /// </summary>
         private bool _glLoaded;
-
-        /// <summary>
-        /// The back buffer for rendering the Mandelbrot set
-        /// </summary>
-        [CanBeNull]
-        private Bitmap _backBuffer;
         
         /// <summary>
         /// The starting position
@@ -46,16 +37,36 @@ namespace widemeadows.Visualization.Mandelbrot
         /// The delta value on the real axis
         /// </summary>
         private Complex _deltaReal;
-
-        /// <summary>
-        /// The pixel format
-        /// </summary>
-        const PixelFormat PixelFormat = System.Drawing.Imaging.PixelFormat.Format32bppArgb;
         
         /// <summary>
         /// The OpenGL texture identifier as created in the call to <see cref="SetupTexture"/>
         /// </summary>
         private int _textureId;
+
+        /// <summary>
+        /// The buffer for rendering the Mandelbrot set
+        /// </summary>
+        private byte[] _backBuffer;
+
+        /// <summary>
+        /// The texture width
+        /// </summary>
+        private int _textureWidth;
+        
+        /// <summary>
+        /// The texture height
+        /// </summary>
+        private int _textureHeight;
+        
+        /// <summary>
+        /// The texture stride
+        /// </summary>
+        private int _textureStride;
+
+        /// <summary>
+        /// The number of bytes per pixel
+        /// </summary>
+        const int BytesPerPixel = 4;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BrotForm"/> class.
@@ -80,15 +91,7 @@ namespace widemeadows.Visualization.Mandelbrot
             base.OnLoad(e);
             PrepareNewBufferAndInvalidate();
         }
-
-        /// <summary>
-        /// Resets the buffer.
-        /// </summary>
-        private void ResetBuffer()
-        {
-            _backBuffer = null;
-        }
-
+        
         /// <summary>
         /// Prepares the new buffer and invalidates the display.
         /// </summary>
@@ -101,7 +104,10 @@ namespace widemeadows.Visualization.Mandelbrot
             if (width == 0 || height == 0) return false;
 
             // create a new image buffer
-            _backBuffer = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat);
+            _textureWidth = width;
+            _textureHeight = height;
+            _textureStride = width*BytesPerPixel;
+            _backBuffer = new byte[(width * BytesPerPixel) * height];
 
             // determine the range in the complex plane
             _topLeft = new Complex(-2D, 1D);
@@ -117,77 +123,70 @@ namespace widemeadows.Visualization.Mandelbrot
 
             return true;
         }
-        
+
         /// <summary>
-        /// Renders the mandelbrot set onto the <paramref name="buffer"/>.
+        /// Renders the mandelbrot set onto the <paramref name="buffer" />.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
-        private unsafe void RenderMandelbrotSet([NotNull] Bitmap buffer)
+        /// <param name="height">The height.</param>
+        /// <param name="width">The width.</param>
+        /// <param name="stride">The stride.</param>
+        private unsafe void RenderMandelbrotSet([NotNull] byte[] buffer, int height, int width, int stride)
         {
-            Debug.Assert(PixelFormat == PixelFormat.Format32bppArgb, "pixelFormat == PixelFormat.Format32bppArgb");
-            const int bytesPerPixel = 4;
-
-            // Predetermine width and height "constants"
-            var width = buffer.Width;
-            var height = buffer.Height;
-
             // Lock the bitmap for rendering
-            var bitmapData = buffer.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat);
-            var scan0 = bitmapData.Scan0;
+            fixed (byte* scan0 = buffer)
+            {
+                // fetch some base pointers
+                var basePointer = scan0;
 
-            // fetch some base pointers
-            var stride = bitmapData.Stride;
-            var basePointer = (byte*) scan0.ToPointer();
-            
-            // determine the running variables in the complex plane
-            var linePosition = _topLeft;
-            var lineIncrease = _deltaImaginary;
-            var pixelIncrease = _deltaReal;
+                // determine the running variables in the complex plane
+                var linePosition = _topLeft;
+                var lineIncrease = _deltaImaginary;
+                var pixelIncrease = _deltaReal;
 
-            // iterate over all lines and columns
-            var options = new ParallelOptions
-                          {
-                              MaxDegreeOfParallelism = Environment.ProcessorCount
-                          };
+                // iterate over all lines and columns
+                var options = new ParallelOptions
+                              {
+                                  MaxDegreeOfParallelism = Environment.ProcessorCount
+                              };
 
-            const int maxIterations = 100;
-            const double inverseMaxIterations = 1.0D/maxIterations;
-            Parallel.For(0, height, options, y =>
-                                    {
-                                        var linePointer = basePointer + y*stride;
-                                        var pixel = linePointer;
-                                        var pixelPosition = linePosition + y*lineIncrease;
-                                        for (var x = 0; x < width; ++x)
-                                        {
-                                            // do the Mandelmagic
-                                            Complex finalZ;
-                                            var iterations = CalculateFractalIterations(pixelPosition, maxIterations, out finalZ);
+                const int maxIterations = 100;
+                const double inverseMaxIterations = 1.0D/maxIterations;
+                Parallel.For(0, height, options, y =>
+                                                 {
+                                                     var linePointer = basePointer + y*stride;
+                                                     var pixel = linePointer;
+                                                     var pixelPosition = linePosition + y*lineIncrease;
+                                                     for (var x = 0; x < width; ++x)
+                                                     {
+                                                         // do the Mandelmagic
+                                                         Complex finalZ;
+                                                         var iterations = CalculateFractalIterations(pixelPosition, maxIterations, out finalZ);
 
-                                            // determine a smooth interpolation value
-                                            // (https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/Mandelbrot_set#Real_Escape_Time)
-                                            var smoothIterations = iterations < maxIterations
-                                                    ? iterations - Math.Log(Math.Log(finalZ.Magnitude, 2), 2)
-                                                    : 0;
+                                                         // determine a smooth interpolation value
+                                                         // (https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/Mandelbrot_set#Real_Escape_Time)
+                                                         var smoothIterations = iterations < maxIterations
+                                                             ? iterations - Math.Log(Math.Log(finalZ.Magnitude, 2), 2)
+                                                             : 0;
 
-                                            // interpolate the color
-                                            var red = 255D*inverseMaxIterations*smoothIterations;
-                                            var green = 0;
-                                            var blue = 0;
+                                                         // interpolate the color
+                                                         var red = 255D*inverseMaxIterations*smoothIterations;
+                                                         var green = 0;
+                                                         var blue = 0;
 
-                                            // patch the colors
-                                            pixel[0] = (byte)blue;
-                                            pixel[1] = (byte)green;
-                                            pixel[2] = (byte)red;
-                                            pixel[3] = 255; // full alpha
+                                                         // patch the colors
+                                                         pixel[0] = (byte) blue;
+                                                         pixel[1] = (byte) green;
+                                                         pixel[2] = (byte) red;
+                                                         pixel[3] = 255; // full alpha
 
-                                            // advance the pixel pointer
-                                            pixel += bytesPerPixel;
-                                            pixelPosition += pixelIncrease;
-                                        }
-                                    });
-            
-            // Release the Kraken
-            buffer.UnlockBits(bitmapData);
+                                                         // advance the pixel pointer
+                                                         pixelPosition += pixelIncrease;
+                                                         pixel += BytesPerPixel;
+                                                     }
+                                                 });
+
+            } // Release the Kraken
         }
 
         /// <summary>
@@ -223,13 +222,11 @@ namespace widemeadows.Visualization.Mandelbrot
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        private void glControl_Load(object sender, EventArgs e)
+        private void GlControlLoad(object sender, EventArgs e)
         {
             _glLoaded = true;
 
-            GL.ClearColor(Color.OrangeRed);
             GL.Enable(EnableCap.Texture2D);
-
             SetupViewport();
             SetupTexture();
         }
@@ -239,38 +236,11 @@ namespace widemeadows.Visualization.Mandelbrot
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        private void glControl_Resize(object sender, EventArgs e)
+        private void GlControlResize(object sender, EventArgs e)
         {
             if (!_glLoaded) return;
             SetupViewport();
             SetupTexture();
-        }
-
-        /// <summary>
-        /// Prepares the rendering texture
-        /// </summary>
-        private void SetupTexture()
-        {
-            // Render the mandelbrot set onto the buffer
-            if (!PrepareNewBufferAndInvalidate()) return;
-            RenderMandelbrotSet(_backBuffer);
-
-            // Create a texture and bind it for all future texture function calls
-            if (_textureId > 0) GL.DeleteTexture(_textureId);
-            var id = _textureId = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2D, id);
-
-            // We will not upload mipmaps, so disable mipmapping (otherwise the texture will not appear).
-            // We can use GL.GenerateMipmaps() or GL.Ext.GenerateMipmaps() to create
-            // mipmaps automatically. In that case, use TextureMinFilter.LinearMipmapLinear to enable them.
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-            
-            var data = _backBuffer.LockBits(new Rectangle(0, 0, _backBuffer.Width, _backBuffer.Height), ImageLockMode.ReadOnly, PixelFormat);
-            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, _backBuffer.Width, _backBuffer.Height, 0, OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
-            _backBuffer.UnlockBits(data);
         }
 
         /// <summary>
@@ -297,11 +267,40 @@ namespace widemeadows.Visualization.Mandelbrot
         }
 
         /// <summary>
+        /// Prepares the rendering texture
+        /// </summary>
+        private void SetupTexture()
+        {
+            // Render the mandelbrot set onto the buffer
+            if (!PrepareNewBufferAndInvalidate()) return;
+
+            var buffer = _backBuffer;
+            var width = _textureWidth;
+            var height = _textureHeight;
+            var stride = _textureStride;
+            RenderMandelbrotSet(buffer, height, width, stride);
+
+            // Create a texture and bind it for all future texture function calls
+            if (_textureId > 0) GL.DeleteTexture(_textureId);
+            var id = _textureId = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, id);
+
+            // Disable mipmapping; set linear filtering.
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0, PixelFormat.Bgra, PixelType.UnsignedByte, buffer);
+        }
+
+
+        /// <summary>
         /// Handles the Paint event of the glControl control.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="e">The <see cref="PaintEventArgs"/> instance containing the event data.</param>
-        private void glControl_Paint(object sender, PaintEventArgs e)
+        private void GlControlPaint(object sender, PaintEventArgs e)
         {
             if (!_glLoaded) return;
 

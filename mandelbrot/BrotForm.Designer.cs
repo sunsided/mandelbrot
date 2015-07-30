@@ -40,9 +40,9 @@
             this.glControl.Size = new System.Drawing.Size(1008, 729);
             this.glControl.TabIndex = 0;
             this.glControl.VSync = true;
-            this.glControl.Load += new System.EventHandler(this.glControl_Load);
-            this.glControl.Paint += new System.Windows.Forms.PaintEventHandler(this.glControl_Paint);
-            this.glControl.Resize += new System.EventHandler(this.glControl_Resize);
+            this.glControl.Load += new System.EventHandler(this.GlControlLoad);
+            this.glControl.Paint += new System.Windows.Forms.PaintEventHandler(this.GlControlPaint);
+            this.glControl.Resize += new System.EventHandler(this.GlControlResize);
             // 
             // BrotForm
             // 
