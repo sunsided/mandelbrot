@@ -92,10 +92,13 @@ namespace widemeadows.Visualization.Mandelbrot
         /// <summary>
         /// Prepares the new buffer and invalidates the display.
         /// </summary>
-        private void PrepareNewBufferAndInvalidate()
+        private bool PrepareNewBufferAndInvalidate()
         {
             var width = ClientSize.Width;
             var height = ClientSize.Height;
+
+            // we don't do that
+            if (width == 0 || height == 0) return false;
 
             // create a new image buffer
             _backBuffer = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat);
@@ -112,7 +115,7 @@ namespace widemeadows.Visualization.Mandelbrot
             _deltaImaginary = new Complex(0, imagDelta);
             _deltaReal = new Complex(realDelta, 0);
 
-            Invalidate();
+            return true;
         }
         
         /// <summary>
@@ -240,6 +243,7 @@ namespace widemeadows.Visualization.Mandelbrot
         {
             if (!_glLoaded) return;
             SetupViewport();
+            SetupTexture();
         }
 
         /// <summary>
@@ -247,8 +251,12 @@ namespace widemeadows.Visualization.Mandelbrot
         /// </summary>
         private void SetupTexture()
         {
-            // Create a texture and bind it for all future texture function calls
+            // Render the mandelbrot set onto the buffer
+            if (!PrepareNewBufferAndInvalidate()) return;
+            RenderMandelbrotSet(_backBuffer);
 
+            // Create a texture and bind it for all future texture function calls
+            if (_textureId > 0) GL.DeleteTexture(_textureId);
             var id = _textureId = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture2D, id);
 
@@ -259,10 +267,6 @@ namespace widemeadows.Visualization.Mandelbrot
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
             GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
-
-            // Render the mandelbrot set onto the buffer
-            PrepareNewBufferAndInvalidate();
-            RenderMandelbrotSet(_backBuffer);
             
             var data = _backBuffer.LockBits(new Rectangle(0, 0, _backBuffer.Width, _backBuffer.Height), ImageLockMode.ReadOnly, PixelFormat);
             GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, _backBuffer.Width, _backBuffer.Height, 0, OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
