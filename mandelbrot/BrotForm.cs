@@ -51,12 +51,7 @@ namespace widemeadows.Visualization.Mandelbrot
         /// The pixel format
         /// </summary>
         const PixelFormat PixelFormat = System.Drawing.Imaging.PixelFormat.Format32bppArgb;
-
-        /// <summary>
-        /// The last window state
-        /// </summary>
-        private FormWindowState LastWindowState;
-
+        
         /// <summary>
         /// The OpenGL texture identifier as created in the call to <see cref="SetupTexture"/>
         /// </summary>
@@ -74,8 +69,6 @@ namespace widemeadows.Visualization.Mandelbrot
                 ControlStyles.Opaque |
                 ControlStyles.UserPaint,
                 true);
-
-            LastWindowState = WindowState;
         }
 
         /// <summary>
@@ -86,44 +79,6 @@ namespace widemeadows.Visualization.Mandelbrot
         {
             base.OnLoad(e);
             PrepareNewBufferAndInvalidate();
-        }
-
-        /// <summary>
-        /// Handles the <see cref="E:ResizeBegin" /> event.
-        /// </summary>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected override void OnResizeBegin(EventArgs e)
-        {
-            base.OnResizeBegin(e);
-            ResetBuffer();
-        }
-
-        /// <summary>
-        /// Handles the <see cref="E:ResizeEnd" /> event.
-        /// </summary>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected override void OnResizeEnd(EventArgs e)
-        {
-            base.OnResizeEnd(e);
-            PrepareNewBufferAndInvalidate();
-        }
-
-        /// <summary>
-        /// Handles the <see cref="E:Resize" /> event.
-        /// </summary>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-
-            // The maximize event is not caught by the OnResize*() methods,
-            // so we'll handle it here if the form is being maximized.
-            if (LastWindowState == WindowState) return;
-            LastWindowState = WindowState;
-            if (WindowState == FormWindowState.Maximized || WindowState == FormWindowState.Normal)
-            {
-                PrepareNewBufferAndInvalidate();
-            }
         }
 
         /// <summary>
@@ -159,29 +114,7 @@ namespace widemeadows.Visualization.Mandelbrot
 
             Invalidate();
         }
-
-        /// <summary>
-        /// Handles the <see cref="E:Paint" /> event.
-        /// </summary>
-        /// <param name="e">The <see cref="PaintEventArgs"/> instance containing the event data.</param>
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-
-            // Fetch the buffer
-            var buffer = _backBuffer;
-            if (buffer == null) return;
-
-            /*
-            // Bake the bread
-            RenderMandelbrotSet(buffer);
-
-            // Render the back buffer onto the form
-            var gr = e.Graphics;
-            gr.DrawImageUnscaledAndClipped(buffer, ClientRectangle);
-            */
-        }
-
+        
         /// <summary>
         /// Renders the mandelbrot set onto the <paramref name="buffer"/>.
         /// </summary>
