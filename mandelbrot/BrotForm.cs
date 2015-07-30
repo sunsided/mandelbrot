@@ -64,6 +64,21 @@ namespace widemeadows.Visualization.Mandelbrot
         private int _textureStride;
 
         /// <summary>
+        /// The mouse down location
+        /// </summary>
+        private Point _mouseDownLocation;
+
+        /// <summary>
+        /// The left mouse button is pressed down
+        /// </summary>
+        private bool _leftMouseDown;
+
+        /// <summary>
+        /// The translation in complex space
+        /// </summary>
+        private Complex _translate = Complex.Zero;
+
+        /// <summary>
         /// The number of bytes per pixel
         /// </summary>
         const int BytesPerPixel = 4;
@@ -83,25 +98,15 @@ namespace widemeadows.Visualization.Mandelbrot
         }
 
         /// <summary>
-        /// Handles the <see cref="E:Load" /> event.
+        /// Prepares the new buffer.
         /// </summary>
-        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-        protected override void OnLoad(EventArgs e)
-        {
-            base.OnLoad(e);
-            PrepareNewBufferAndInvalidate();
-        }
-        
-        /// <summary>
-        /// Prepares the new buffer and invalidates the display.
-        /// </summary>
-        private bool PrepareNewBufferAndInvalidate()
+        private void PrepareNewBuffer()
         {
             var width = ClientSize.Width;
             var height = ClientSize.Height;
 
             // we don't do that
-            if (width == 0 || height == 0) return false;
+            if (width == 0 || height == 0) return;
 
             // create a new image buffer
             _textureWidth = width;
@@ -110,8 +115,8 @@ namespace widemeadows.Visualization.Mandelbrot
             _backBuffer = new byte[(width * BytesPerPixel) * height];
 
             // determine the range in the complex plane
-            _topLeft = new Complex(-2D, 1D);
-            _bottomRight = new Complex(1D, -1D);
+            _topLeft = new Complex(-2D, 1D) + _translate;
+            _bottomRight = new Complex(1D, -1D) + _translate;
 
             // determine the step parameters in the complex plane
             var realDelta = (_bottomRight.Real - _topLeft.Real)/(width - 1D);
@@ -120,8 +125,6 @@ namespace widemeadows.Visualization.Mandelbrot
             // calculate the actual positions and steps in the complex plane
             _deltaImaginary = new Complex(0, imagDelta);
             _deltaReal = new Complex(realDelta, 0);
-
-            return true;
         }
 
         /// <summary>
@@ -228,6 +231,8 @@ namespace widemeadows.Visualization.Mandelbrot
 
             GL.Enable(EnableCap.Texture2D);
             SetupViewport();
+
+            PrepareNewBuffer();
             SetupTexture();
         }
 
@@ -240,6 +245,8 @@ namespace widemeadows.Visualization.Mandelbrot
         {
             if (!_glLoaded) return;
             SetupViewport();
+
+            PrepareNewBuffer();
             SetupTexture();
         }
 
@@ -271,13 +278,12 @@ namespace widemeadows.Visualization.Mandelbrot
         /// </summary>
         private void SetupTexture()
         {
-            // Render the mandelbrot set onto the buffer
-            if (!PrepareNewBufferAndInvalidate()) return;
-
             var buffer = _backBuffer;
             var width = _textureWidth;
             var height = _textureHeight;
             var stride = _textureStride;
+            if (width <= 0 || height <= 0) return;
+
             RenderMandelbrotSet(buffer, height, width, stride);
 
             // Create a texture and bind it for all future texture function calls
@@ -328,6 +334,54 @@ namespace widemeadows.Visualization.Mandelbrot
 
             GL.Flush();
             glControl.SwapBuffers();
+        }
+
+        /// <summary>
+        /// Handles the MouseDown event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="MouseEventArgs"/> instance containing the event data.</param>
+        private void GlControlMouseDown(object sender, MouseEventArgs e)
+        {
+            if ((e.Button & MouseButtons.Left) != MouseButtons.Left) return;
+            _leftMouseDown = true;
+            _mouseDownLocation = e.Location;
+        }
+
+        /// <summary>
+        /// Handles the MouseUp event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="MouseEventArgs"/> instance containing the event data.</param>
+        private void GlControlMouseUp(object sender, MouseEventArgs e)
+        {
+            if ((e.Button & MouseButtons.Left) != MouseButtons.Left) return;
+            _leftMouseDown = false;
+        }
+
+        /// <summary>
+        /// Handles the MouseMove event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="MouseEventArgs"/> instance containing the event data.</param>
+        private void GlControlMouseMove(object sender, MouseEventArgs e)
+        {
+            var translateX = _mouseDownLocation.X - e.Location.X;
+            var translateY = _mouseDownLocation.Y - e.Location.Y;
+
+            // calculate the translation and store the current mouse position
+            _translate = translateX * _deltaReal + translateY * _deltaImaginary;
+            _mouseDownLocation = e.Location;
+
+            // if there is nothing to do, bye
+            if (!_leftMouseDown || translateX == 0 && translateY == 0) return;
+
+            // update the edges and re-render
+            _topLeft += _translate;
+            _bottomRight += _translate;
+
+            SetupTexture();
+            glControl.Refresh();
         }
     }
 }

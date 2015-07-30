@@ -42,6 +42,9 @@
             this.glControl.VSync = true;
             this.glControl.Load += new System.EventHandler(this.GlControlLoad);
             this.glControl.Paint += new System.Windows.Forms.PaintEventHandler(this.GlControlPaint);
+            this.glControl.MouseDown += new System.Windows.Forms.MouseEventHandler(this.GlControlMouseDown);
+            this.glControl.MouseMove += new System.Windows.Forms.MouseEventHandler(this.GlControlMouseMove);
+            this.glControl.MouseUp += new System.Windows.Forms.MouseEventHandler(this.GlControlMouseUp);
             this.glControl.Resize += new System.EventHandler(this.GlControlResize);
             // 
             // BrotForm
