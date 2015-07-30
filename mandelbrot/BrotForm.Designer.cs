@@ -46,6 +46,7 @@
             this.glControl.MouseMove += new System.Windows.Forms.MouseEventHandler(this.GlControlMouseMove);
             this.glControl.MouseUp += new System.Windows.Forms.MouseEventHandler(this.GlControlMouseUp);
             this.glControl.Resize += new System.EventHandler(this.GlControlResize);
+            this.glControl.MouseWheel += new System.Windows.Forms.MouseEventHandler(this.GlControlMouseWheel);
             // 
             // BrotForm
             // 

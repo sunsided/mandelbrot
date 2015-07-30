@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using JetBrains.Annotations;
 using OpenTK.Graphics.OpenGL;
+using OpenTK.Input;
+using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 
 namespace widemeadows.Visualization.Mandelbrot
 {
@@ -114,13 +116,17 @@ namespace widemeadows.Visualization.Mandelbrot
             _textureStride = width*BytesPerPixel;
             _backBuffer = new byte[(width * BytesPerPixel) * height];
 
-            // determine the range in the complex plane
-            _topLeft = new Complex(-2D, 1D) + _translate;
-            _bottomRight = new Complex(1D, -1D) + _translate;
+            UpdateSteps();
+        }
 
+        /// <summary>
+        /// Updates the steps.
+        /// </summary>
+        private void UpdateSteps()
+        {
             // determine the step parameters in the complex plane
-            var realDelta = (_bottomRight.Real - _topLeft.Real)/(width - 1D);
-            var imagDelta = (_bottomRight.Imaginary - _topLeft.Imaginary)/(height - 1D); // flipped, because of the way the bitmap works
+            var realDelta = (_bottomRight.Real - _topLeft.Real)/(_textureWidth - 1D);
+            var imagDelta = (_bottomRight.Imaginary - _topLeft.Imaginary)/(_textureHeight- 1D); // flipped, because of the way the bitmap works
 
             // calculate the actual positions and steps in the complex plane
             _deltaImaginary = new Complex(0, imagDelta);
@@ -143,7 +149,7 @@ namespace widemeadows.Visualization.Mandelbrot
                 var basePointer = scan0;
 
                 // determine the running variables in the complex plane
-                var linePosition = _topLeft;
+                var linePosition = _topLeft + _translate;
                 var lineIncrease = _deltaImaginary;
                 var pixelIncrease = _deltaReal;
 
@@ -340,7 +346,7 @@ namespace widemeadows.Visualization.Mandelbrot
         /// Handles the MouseDown event of the glControl control.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="MouseEventArgs"/> instance containing the event data.</param>
+        /// <param name="e">The <see cref="System.Windows.Forms.MouseEventArgs"/> instance containing the event data.</param>
         private void GlControlMouseDown(object sender, MouseEventArgs e)
         {
             if ((e.Button & MouseButtons.Left) != MouseButtons.Left) return;
@@ -380,6 +386,45 @@ namespace widemeadows.Visualization.Mandelbrot
             _topLeft += _translate;
             _bottomRight += _translate;
 
+            SetupTexture();
+            glControl.Refresh();
+        }
+
+        /// <summary>
+        /// Handles the MouseWheel event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        private void GlControlMouseWheel(object sender, MouseEventArgs e)
+        {
+            var zoomFactor = 0.5F;
+            if (e.Delta > 0)
+            {
+                zoomFactor = 2F;
+            }
+
+            var topLeft = new Vector2((float)_topLeft.Real, (float)_topLeft.Imaginary);
+            var bottomRight = new Vector2((float)_bottomRight.Real, (float)_bottomRight.Imaginary);
+
+            // normalize the current mouse location to the range (0,0)-(1,1)
+            var formTopLeft = Vector2.Zero;
+            var formBottomRight = new Vector2(_textureWidth, _textureHeight);
+            var current = (new Vector2(_mouseDownLocation.X, _mouseDownLocation.Y) - formTopLeft) / (formBottomRight - formTopLeft);
+
+            // interpolate the normalized location to the original bounds
+            var originalTopLeft = topLeft;
+            var originalBottomRight = bottomRight;
+            current = (originalBottomRight - originalTopLeft)*current + originalTopLeft;
+
+            // calculate the new position
+            topLeft = (topLeft - current)*zoomFactor + current;
+            bottomRight = (bottomRight - current) * zoomFactor + current;
+
+            // update the edges and re-render
+            _topLeft = new Complex(topLeft.X, topLeft.Y);
+            _bottomRight = new Complex(bottomRight.X, bottomRight.Y);
+
+            UpdateSteps();
             SetupTexture();
             glControl.Refresh();
         }
