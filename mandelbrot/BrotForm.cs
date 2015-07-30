@@ -219,7 +219,7 @@ namespace widemeadows.Visualization.Mandelbrot
                                             // (https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/Mandelbrot_set#Real_Escape_Time)
                                             var smoothIterations = iterations < maxIterations
                                                     ? iterations - Math.Log(Math.Log(finalZ.Magnitude, 2), 2)
-                                                    : maxIterations;
+                                                    : 0;
 
                                             // interpolate the color
                                             var red = 255D*inverseMaxIterations*smoothIterations;
