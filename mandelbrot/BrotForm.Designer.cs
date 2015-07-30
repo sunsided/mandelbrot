@@ -28,21 +28,38 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.glControl = new OpenTK.GLControl();
             this.SuspendLayout();
             // 
-            // Form1
+            // glControl
+            // 
+            this.glControl.BackColor = System.Drawing.Color.Black;
+            this.glControl.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.glControl.Location = new System.Drawing.Point(0, 0);
+            this.glControl.Name = "glControl";
+            this.glControl.Size = new System.Drawing.Size(623, 342);
+            this.glControl.TabIndex = 0;
+            this.glControl.VSync = true;
+            this.glControl.Load += new System.EventHandler(this.glControl_Load);
+            this.glControl.Paint += new System.Windows.Forms.PaintEventHandler(this.glControl_Paint);
+            this.glControl.Resize += new System.EventHandler(this.glControl_Resize);
+            // 
+            // BrotForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(623, 342);
+            this.Controls.Add(this.glControl);
             this.MinimumSize = new System.Drawing.Size(300, 200);
-            this.Name = "Form1";
+            this.Name = "BrotForm";
             this.Text = "Mandelbrot";
             this.ResumeLayout(false);
 
         }
 
         #endregion
+
+        private OpenTK.GLControl glControl;
     }
 }
 

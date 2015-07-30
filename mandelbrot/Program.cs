@@ -1,11 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using widemeadows.Visualization.Mandelbrot;
 
-namespace mandelbrot
+namespace widemeadows.Visualization.Mandelbrot
 {
     static class Program
     {

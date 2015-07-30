@@ -6,6 +6,8 @@ using System.Numerics;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using JetBrains.Annotations;
+using OpenTK.Graphics.OpenGL;
+using PixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace widemeadows.Visualization.Mandelbrot
 {
@@ -14,6 +16,11 @@ namespace widemeadows.Visualization.Mandelbrot
     /// </summary>
     public partial class BrotForm : Form
     {
+        /// <summary>
+        /// Determines if the OpenGL control has been loaded
+        /// </summary>
+        private bool _glLoaded;
+
         /// <summary>
         /// The back buffer for rendering the Mandelbrot set
         /// </summary>
@@ -59,9 +66,7 @@ namespace widemeadows.Visualization.Mandelbrot
 
             SetStyle(
                 ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.DoubleBuffer |
                 ControlStyles.Opaque |
-                ControlStyles.OptimizedDoubleBuffer |
                 ControlStyles.UserPaint,
                 true);
 
@@ -268,6 +273,72 @@ namespace widemeadows.Visualization.Mandelbrot
             } 
 
             return iteration;
+        }
+
+        /// <summary>
+        /// Handles the Load event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        private void glControl_Load(object sender, EventArgs e)
+        {
+            _glLoaded = true;
+
+            // set rendering defaults
+            GL.ClearColor(Color.OrangeRed);
+            SetupViewport();
+        }
+
+        /// <summary>
+        /// Prepares the OpenGL viewport.
+        /// </summary>
+        private void SetupViewport()
+        {
+            int width = glControl.Width;
+            int height = glControl.Height;
+
+            // Prepare the projection matrix
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+
+            // lower-left corner is (0,0)
+            GL.Ortho(0, width, 0, height, -1, 1);
+
+            // use the full painting area
+            GL.Viewport(0, 0, width, height); // Use all of the glControl painting area
+        }
+
+        /// <summary>
+        /// Handles the Resize event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        private void glControl_Resize(object sender, EventArgs e)
+        {
+            if (!_glLoaded) return;
+        }
+
+        /// <summary>
+        /// Handles the Paint event of the glControl control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="PaintEventArgs"/> instance containing the event data.</param>
+        private void glControl_Paint(object sender, PaintEventArgs e)
+        {
+            if (!_glLoaded) return;
+
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
+            GL.Color3(Color.Yellow);
+            GL.Begin(PrimitiveType.TriangleFan);
+            GL.Vertex2(10, 20);
+            GL.Vertex2(100, 20);
+            GL.Vertex2(100, 50);
+            GL.End();
+
+            glControl.SwapBuffers();
         }
     }
 }
