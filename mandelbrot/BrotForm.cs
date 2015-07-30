@@ -201,6 +201,9 @@ namespace widemeadows.Visualization.Mandelbrot
                           {
                               MaxDegreeOfParallelism = Environment.ProcessorCount
                           };
+
+            const int maxIterations = 100;
+            const double inverseMaxIterations = 1.0D/maxIterations;
             Parallel.For(0, height, options, y =>
                                     {
                                         var linePointer = basePointer + y*stride;
@@ -209,13 +212,25 @@ namespace widemeadows.Visualization.Mandelbrot
                                         for (var x = 0; x < width; ++x)
                                         {
                                             // do the Mandelmagic
-                                            var iterations = CalculateFractalIterations(pixelPosition);
+                                            Complex finalZ;
+                                            var iterations = CalculateFractalIterations(pixelPosition, maxIterations, out finalZ);
+
+                                            // determine a smooth interpolation value
+                                            // (https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/Mandelbrot_set#Real_Escape_Time)
+                                            var smoothIterations = iterations < maxIterations
+                                                    ? iterations - Math.Log(Math.Log(finalZ.Magnitude, 2), 2)
+                                                    : maxIterations;
+
+                                            // interpolate the color
+                                            var red = 255D*inverseMaxIterations*smoothIterations;
+                                            var green = 0;
+                                            var blue = 0;
 
                                             // patch the colors
-                                            pixel[0] = 0; // blue
-                                            pixel[1] = 0; // green
-                                            pixel[2] = (byte) iterations; // red
-                                            pixel[3] = 255; // alpha
+                                            pixel[0] = (byte)blue;
+                                            pixel[1] = (byte)green;
+                                            pixel[2] = (byte)red;
+                                            pixel[3] = 255; // full alpha
 
                                             // advance the pixel pointer
                                             pixel += bytesPerPixel;
@@ -226,25 +241,26 @@ namespace widemeadows.Visualization.Mandelbrot
             // Release the Kraken
             buffer.UnlockBits(bitmapData);
         }
-        
+
         /// <summary>
         /// Determines the number of iterations required for the Mandelbrot
         /// fractal <c>Z_{n+1}(c) = z^2_{n}(c) + c</c> to reach the value of <c>2</c>.
         /// </summary>
         /// <param name="c">The location in the complex plane.</param>
+        /// <param name="maxIterations">The maximum number of iterations.</param>
+        /// <param name="z">The z.</param>
         /// <returns>System.Int32.</returns>
-        private static int CalculateFractalIterations(Complex c)
+        private static int CalculateFractalIterations(Complex c, int maxIterations, out Complex z)
         {
-            const int maxIterations = 255;
             var iteration = 0;
 
             const double maxMagnitude = 2D;
             const double maxMagnitudeSquared = maxMagnitude*maxMagnitude;
 
-            var z = Complex.Zero;
-            while (iteration < maxIterations)
+            // iterate until the maximum magnitude is reached
+            z = Complex.Zero;
+            while (++iteration < maxIterations)
             {
-                ++iteration;
                 z = z*z + c;
 
                 var squaredNorm = z.Real*z.Real + z.Imaginary*z.Imaginary;
