@@ -5,15 +5,14 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using JetBrains.Annotations;
 using OpenTK.Graphics.OpenGL;
-using OpenTK.Input;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 
-namespace widemeadows.Visualization.Mandelbrot
+namespace Widemeadows.Visualization.Mandelbrot
 {
     /// <summary>
     /// Class BrotForm.
     /// </summary>
-    public partial class BrotForm : Form
+    internal sealed partial class BrotForm : Form
     {
         /// <summary>
         /// Determines if the OpenGL control has been loaded
@@ -134,6 +133,48 @@ namespace widemeadows.Visualization.Mandelbrot
         }
 
         /// <summary>
+        /// Helper structure to bundle per-line rendering parameters
+        /// </summary>
+        private unsafe struct RenderInfo
+        {
+            /// <summary>
+            /// The image width
+            /// </summary>
+            internal readonly int Width;
+
+            /// <summary>
+            /// The line pointer
+            /// </summary>
+            [NotNull]
+            internal readonly byte* LinePointer;
+
+            /// <summary>
+            /// The position in the complex plane
+            /// </summary>
+            internal readonly Complex PixelPosition;
+
+            /// <summary>
+            /// The positional increment in x direction
+            /// </summary>
+            internal readonly Complex PixelIncrease;
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="RenderInfo"/> struct.
+            /// </summary>
+            /// <param name="linePointer">The line pointer.</param>
+            /// <param name="pixelPosition">The pixel position.</param>
+            /// <param name="pixelIncrease">The pixel increase.</param>
+            /// <param name="width">The width.</param>
+            internal RenderInfo([NotNull] byte* linePointer, Complex pixelPosition, Complex pixelIncrease, int width)
+            {
+                LinePointer = linePointer;
+                PixelPosition = pixelPosition;
+                PixelIncrease = pixelIncrease;
+                Width = width;
+            }
+        }
+
+        /// <summary>
         /// Renders the mandelbrot set onto the <paramref name="buffer" />.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
@@ -160,42 +201,90 @@ namespace widemeadows.Visualization.Mandelbrot
                               };
 
                 const int maxIterations = 100;
-                const double inverseMaxIterations = 1.0D/maxIterations;
                 Parallel.For(0, height, options, y =>
                                                  {
-                                                     var linePointer = basePointer + y*stride;
-                                                     var pixel = linePointer;
-                                                     var pixelPosition = linePosition + y*lineIncrease;
-                                                     for (var x = 0; x < width; ++x)
-                                                     {
-                                                         // do the Mandelmagic
-                                                         Complex finalZ;
-                                                         var iterations = CalculateFractalIterations(pixelPosition, maxIterations, out finalZ);
+                                                     var linePointer = basePointer + y * stride;
+                                                     var pixelPosition = linePosition + y * lineIncrease;
+                                                     var ii = new RenderInfo(linePointer, pixelPosition, pixelIncrease, width);
 
-                                                         // determine a smooth interpolation value
-                                                         // (https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/Mandelbrot_set#Real_Escape_Time)
-                                                         var smoothIterations = iterations < maxIterations
-                                                             ? iterations - Math.Log(Math.Log(finalZ.Magnitude, 2), 2)
-                                                             : 0;
-
-                                                         // interpolate the color
-                                                         var red = 255D*inverseMaxIterations*smoothIterations;
-                                                         var green = 0;
-                                                         var blue = 0;
-
-                                                         // patch the colors
-                                                         pixel[0] = (byte) blue;
-                                                         pixel[1] = (byte) green;
-                                                         pixel[2] = (byte) red;
-                                                         pixel[3] = 255; // full alpha
-
-                                                         // advance the pixel pointer
-                                                         pixelPosition += pixelIncrease;
-                                                         pixel += BytesPerPixel;
-                                                     }
+                                                     RenderSingleLine(ref ii, maxIterations);
                                                  });
 
             } // Release the Kraken
+        }
+
+        /// <summary>
+        /// Renders a single line of the mandelbrot image.
+        /// </summary>
+        /// <param name="renderInfo">The image information.</param>
+        /// <param name="maxIterations">The maximum iterations.</param>
+        private static unsafe void RenderSingleLine(ref RenderInfo renderInfo, int maxIterations)
+        {
+            var colorScale = 255D / maxIterations;
+
+            var width = renderInfo.Width;
+            var pixel = renderInfo.LinePointer;
+            var pixelPosition = renderInfo.PixelPosition;
+            var pixelIncrease = renderInfo.PixelIncrease;
+
+            for (var x = 0; x < width; ++x)
+            {
+                SetColorAtLocation(pixel, ref pixelPosition, colorScale, maxIterations);
+
+                // advance the pixel pointer
+                pixelPosition += pixelIncrease;
+                pixel += BytesPerPixel;
+            }
+        }
+
+        /// <summary>
+        /// Sets the color of the <paramref name="pixel"/> at the given <paramref name="location"/>
+        /// </summary>
+        /// <param name="pixel">The pixel.</param>
+        /// <param name="location">The pixel position.</param>
+        /// <param name="colorScale">The color scale.</param>
+        /// <param name="maxIterations">The maximum iterations.</param>
+        private static unsafe void SetColorAtLocation([NotNull] byte* pixel, ref Complex location, double colorScale, int maxIterations)
+        {
+            const int blue = 0, green = 1, red = 2, alpha = 3;
+
+            // do the Mandelmagic
+            var iterations = DetermineNumberOfIterationsRequired(ref location, maxIterations);
+
+            // patch the colors
+            pixel[blue] = (byte) 0;
+            pixel[green] = (byte) 0;
+            pixel[red] = (byte) (iterations*colorScale);
+            pixel[alpha] = 255; // full alpha
+        }
+
+        /// <summary>
+        /// Determines how many iterations are required to determine unboundedness.
+        /// </summary>
+        /// <param name="location">The pixel position.</param>
+        /// <param name="maxIterations">The maximum iterations.</param>
+        /// <returns>System.Double.</returns>
+        private static double DetermineNumberOfIterationsRequired(ref Complex location, int maxIterations)
+        {
+            Complex finalZ;
+            var iterations = CalculateFractalIterations(location, maxIterations, out finalZ);
+            var smoothIterations = InterpolateIterations(maxIterations, iterations, ref finalZ);
+            return smoothIterations;
+        }
+
+        /// <summary>
+        /// Interpolates the iterations so that it becomes smoother.
+        /// </summary>
+        /// <param name="maxIterations">The maximum iterations.</param>
+        /// <param name="iterations">The iterations.</param>
+        /// <param name="finalZ">The final z.</param>
+        /// <returns>System.Double.</returns>
+        private static double InterpolateIterations(int maxIterations, int iterations, ref Complex finalZ)
+        {
+            // (https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/Mandelbrot_set#Real_Escape_Time)
+            return iterations < maxIterations
+                ? iterations - Math.Log(Math.Log(finalZ.Magnitude, 2D), 2D)
+                : 0D;
         }
 
         /// <summary>
@@ -261,8 +350,8 @@ namespace widemeadows.Visualization.Mandelbrot
         /// </summary>
         private void SetupViewport()
         {
-            int width = glControl.Width;
-            int height = glControl.Height;
+            int width = _glControl.Width;
+            int height = _glControl.Height;
 
             // Prepare the projection matrix
             GL.MatrixMode(MatrixMode.Projection);
@@ -339,7 +428,7 @@ namespace widemeadows.Visualization.Mandelbrot
             GL.End();
 
             GL.Flush();
-            glControl.SwapBuffers();
+            _glControl.SwapBuffers();
         }
 
         /// <summary>
@@ -387,7 +476,7 @@ namespace widemeadows.Visualization.Mandelbrot
             _bottomRight += _translate;
 
             SetupTexture();
-            glControl.Refresh();
+            _glControl.Refresh();
         }
 
         /// <summary>
@@ -424,7 +513,7 @@ namespace widemeadows.Visualization.Mandelbrot
 
             UpdateSteps();
             SetupTexture();
-            glControl.Refresh();
+            _glControl.Refresh();
         }
     }
 }

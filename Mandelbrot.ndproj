@@ -1989,7 +1989,7 @@ select new { t, t.SizeOfInst, t.InstanceFields }
 // the **deep implications** of transforming a class into a structure.
 // http://msdn.microsoft.com/en-us/library/aa664471(v=vs.71).aspx
 //</HowToFix>]]></Query>
-      <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Avoid namespaces with few types</Name>
+      <Query Active="False" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Avoid namespaces with few types</Name>
 warnif count > 0 from n in JustMyCode.Namespaces 
 where n.Name.Length > 0 // Don't match anonymous namespaces
 let types = n.ChildTypes.Where(t => !t.IsGeneratedByCompiler)
@@ -4511,7 +4511,7 @@ select new {
 // *finer solution* by tagging eah concerned field with 
 // *CannotDecreaseVisibilityAttribute*.
 //</HowToFix>]]></Query>
-      <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Types that could be declared as private, nested in a parent type</Name>
+      <Query Active="False" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Types that could be declared as private, nested in a parent type</Name>
 
 warnif count > 0 
 from t in Application.Types
@@ -4650,7 +4650,7 @@ select new { t, ctors }
 // either declare the constructor as *protected*, 
 // or do not declare the type as *abstract*.
 //</HowToFix>]]></Query>
-      <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[//<Name>Avoid public methods not publicly visible</Name>
+      <Query Active="False" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[//<Name>Avoid public methods not publicly visible</Name>
 
 warnif count > 0
 from m in JustMyCode.Methods where 
@@ -5293,14 +5293,15 @@ select new { m, m.NbLinesOfCode }
 //</HowToFix>]]></Query>
     </Group>
     <Group Name="Naming Conventions" Active="True" ShownInReport="False">
-      <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Instance fields should be prefixed with a 'm_'</Name>
+      <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Instance fields should be prefixed with a '_'</Name>
 warnif count > 0 from f in Application.Fields where 
   !f.NameLike(@"^_") && 
   !f.IsStatic && 
   !f.IsLiteral && 
   !f.IsGeneratedByCompiler  && 
   !f.IsSpecialName && 
-  !f.IsEventDelegateObject
+  !f.IsEventDelegateObject &&
+  !(f.IsPublic || f.IsInternal)
 select new { f, f.SizeOfInst } 
 
 //<Description>
@@ -5862,7 +5863,7 @@ select new {
 //<HowToFix>
 // To fix a violation of this rule, create a source file for each type.
 //</HowToFix>]]></Query>
-      <Query Active="True" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Namespace name should correspond to file location</Name>
+      <Query Active="False" DisplayList="True" DisplayStat="False" DisplaySelectionView="False" IsCriticalRule="False"><![CDATA[// <Name>Namespace name should correspond to file location</Name>
 
 warnif count > 0
 from n in Application.Namespaces 
