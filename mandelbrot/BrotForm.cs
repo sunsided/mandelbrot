@@ -19,7 +19,7 @@ namespace widemeadows.Visualization.Mandelbrot
         /// Determines if the OpenGL control has been loaded
         /// </summary>
         private bool _glLoaded;
-        
+
         /// <summary>
         /// The starting position
         /// </summary>
@@ -34,12 +34,12 @@ namespace widemeadows.Visualization.Mandelbrot
         /// The delta value on the imaginary axis
         /// </summary>
         private Complex _deltaImaginary;
-        
+
         /// <summary>
         /// The delta value on the real axis
         /// </summary>
         private Complex _deltaReal;
-        
+
         /// <summary>
         /// The OpenGL texture identifier as created in the call to <see cref="SetupTexture"/>
         /// </summary>
@@ -54,12 +54,12 @@ namespace widemeadows.Visualization.Mandelbrot
         /// The texture width
         /// </summary>
         private int _textureWidth;
-        
+
         /// <summary>
         /// The texture height
         /// </summary>
         private int _textureHeight;
-        
+
         /// <summary>
         /// The texture stride
         /// </summary>
@@ -221,7 +221,7 @@ namespace widemeadows.Visualization.Mandelbrot
 
                 var squaredNorm = z.Real*z.Real + z.Imaginary*z.Imaginary;
                 if (squaredNorm >= maxMagnitudeSquared) break;
-            } 
+            }
 
             return iteration;
         }
@@ -332,10 +332,10 @@ namespace widemeadows.Visualization.Mandelbrot
 
             GL.TexCoord2(1, 1);
             GL.Vertex2(1, 1);
-            
+
             GL.TexCoord2(0, 1);
             GL.Vertex2(0, 1);
-            
+
             GL.End();
 
             GL.Flush();
