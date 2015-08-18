@@ -7,7 +7,7 @@
     <ProjectGuid>{5633346E-C4A0-4D6A-807E-7EF52D102F0A}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>widemeadows.Visualization.Mandelbrot</RootNamespace>
+    <RootNamespace>Widemeadows.Visualization.Mandelbrot</RootNamespace>
     <AssemblyName>mandelbrot</AssemblyName>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>

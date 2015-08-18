@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace widemeadows.Visualization.Mandelbrot.Properties {
+namespace Widemeadows.Visualization.Mandelbrot.Properties {
     using System;
     
     
@@ -39,7 +39,7 @@ namespace widemeadows.Visualization.Mandelbrot.Properties {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("widemeadows.Visualization.Mandelbrot.Properties.Resources", typeof(Resources).Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Widemeadows.Visualization.Mandelbrot.Properties.Resources", typeof(Resources).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;

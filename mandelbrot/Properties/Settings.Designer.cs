@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace widemeadows.Visualization.Mandelbrot.Properties {
+namespace Widemeadows.Visualization.Mandelbrot.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]

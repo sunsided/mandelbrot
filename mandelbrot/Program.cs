@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 
-namespace widemeadows.Visualization.Mandelbrot
+namespace Widemeadows.Visualization.Mandelbrot
 {
     static class Program
     {
