@@ -185,3 +185,4 @@ $RECYCLE.BIN/
 *.GhostDoc.xml
 /external/
 /NDependOut/
+*.ndproj
